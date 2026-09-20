@@ -27,8 +27,8 @@ Route::middleware('auth')->group(function () {
     // Inventory viewing — every role can view stock (staff see only their branch)
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
 
-    // --- Owner / Co-Owner only ---
-    Route::middleware('role:owner,co_owner')->group(function () {
+    // --- Owner / Manager only ---
+    Route::middleware('role:owner,manager')->group(function () {
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');

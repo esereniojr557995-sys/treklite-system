@@ -13,14 +13,17 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // --- Branches (matches Chapter 1: Main, Matina, Malita) ---
+        // --- Branches (matches Chapter 1: Main, Matina) ---
+        // The Malita branch has since closed and is intentionally not
+        // seeded — it no longer exists in the current operations.
         $main = Branch::create(['name' => 'Main', 'location' => 'Green Meadow Subdivision']);
         $matina = Branch::create(['name' => 'Matina', 'location' => 'Matina Centerpoint']);
-        $malita = Branch::create(['name' => 'Malita', 'location' => 'Malita, Davao Occidental']);
 
         // --- Users (matches Chapter 1 Roles and Responsibilities) ---
+        // Names are intentionally generic (no personal names), per the
+        // data-privacy note validated with the adviser.
         User::create([
-            'name' => 'Clyde Careñosa',
+            'name' => 'Owner',
             'email' => 'owner@treklite.test',
             'password' => Hash::make('password'),
             'role' => 'owner',
@@ -28,10 +31,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         User::create([
-            'name' => 'Co-Owner',
-            'email' => 'coowner@treklite.test',
+            'name' => 'Manager',
+            'email' => 'manager@treklite.test',
             'password' => Hash::make('password'),
-            'role' => 'co_owner',
+            'role' => 'manager',
             'branch_id' => $main->id,
         ]);
 
@@ -41,14 +44,6 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'staff',
             'branch_id' => $matina->id,
-        ]);
-
-        User::create([
-            'name' => 'Malita Staff',
-            'email' => 'staff.malita@treklite.test',
-            'password' => Hash::make('password'),
-            'role' => 'staff',
-            'branch_id' => $malita->id,
         ]);
 
         // --- A few sample products (outdoor slippers/apparel/textiles) ---
@@ -63,7 +58,7 @@ class DatabaseSeeder extends Seeder
             $product = Product::create($p + ['low_stock_threshold' => 5]);
 
             // Seed starting stock per branch
-            foreach ([$main, $matina, $malita] as $branch) {
+            foreach ([$main, $matina] as $branch) {
                 Inventory::create([
                     'product_id' => $product->id,
                     'branch_id' => $branch->id,

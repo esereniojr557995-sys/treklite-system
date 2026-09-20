@@ -56,7 +56,7 @@ class SaleController extends Controller
         $user = Auth::user();
 
         // For Staff, stock is only relevant for their own branch. For
-        // Owner/Co-Owner, include stock for every branch so the branch
+        // Owner/Manager, include stock for every branch so the branch
         // dropdown can be switched without reloading the page.
         $products = Product::orderBy('name')
             ->with(['inventories' => function ($query) use ($user) {
@@ -94,9 +94,9 @@ class SaleController extends Controller
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        // Staff can only sell from their own branch; Owner/Co-Owner may
+        // Staff can only sell from their own branch; Owner/Manager may
         // pass a branch_id to record a sale at any branch — this models
-        // the Owner/Co-Owner personally stepping in to cover a branch when
+        // the Owner/Manager personally stepping in to cover a branch when
         // its assigned staff member is unavailable (see Chapter 1,
         // Organizational Chart: branch continuity).
         $branchId = $user->isStaff() ? $user->branch_id : $request->input('branch_id', $user->branch_id);

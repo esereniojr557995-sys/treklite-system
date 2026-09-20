@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('branches', function (Blueprint $table) {
             $table->id();
-            $table->string('name');              // e.g. "Main", "Matina", "Malita"
+            $table->string('name');              // e.g. "Main", "Matina"
             $table->string('location')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

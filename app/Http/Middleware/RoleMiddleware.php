@@ -10,10 +10,10 @@ use Symfony\Component\HttpFoundation\Response;
  * Restricts a route to one or more roles.
  *
  * Usage in routes/web.php:
- *   Route::middleware('role:owner,co_owner')->group(function () { ... });
+ *   Route::middleware('role:owner,manager')->group(function () { ... });
  *
  * This is what implements the "Implement role-based access" objective:
- * Owner/Co-Owner get full access; Staff is limited to their own branch's
+ * Owner/Manager get full access; Staff is limited to their own branch's
  * sales screens (enforced again inside SaleController for defense-in-depth).
  */
 class RoleMiddleware

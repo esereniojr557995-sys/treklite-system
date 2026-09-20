@@ -9,10 +9,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            // owner        -> full access, all branches
-            // co_owner     -> full access, all branches (per Chapter 1: acts as owner's support system)
-            // staff        -> limited access, tied to one branch (Matina or Malita)
-            $table->enum('role', ['owner', 'co_owner', 'staff'])->default('staff')->after('email');
+            // owner   -> top authority, full access, all branches
+            // manager -> one level below Owner, full access, all branches
+            //            (per Chapter 1: assists the Owner and is authorized
+            //            to act on the Owner's behalf when needed)
+            // staff   -> limited access, tied to one branch (Matina)
+            $table->enum('role', ['owner', 'manager', 'staff'])->default('staff')->after('email');
             $table->foreignId('branch_id')->nullable()->after('role')
                 ->constrained('branches')->nullOnDelete();
         });

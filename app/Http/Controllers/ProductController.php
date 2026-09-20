@@ -8,7 +8,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 
 /**
- * Product catalog management — Owner/Co-Owner only (see routes/web.php).
+ * Product catalog management — Owner/Manager only (see routes/web.php).
  * Creating a product also seeds a zero-stock inventory row per branch,
  * so every product is immediately visible/trackable across branches.
  */

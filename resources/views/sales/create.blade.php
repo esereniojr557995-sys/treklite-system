@@ -159,7 +159,7 @@
             const submitBtn = document.getElementById('submit-btn');
 
             if (overStock) {
-                warningBox.textContent = `Not enough stock for: ${overStockNames.join(', ')}. Adjust the quantity or check with the Owner/Co-Owner about restocking.`;
+                warningBox.textContent = `Not enough stock for: ${overStockNames.join(', ')}. Adjust the quantity or check with the Owner/Manager about restocking.`;
                 warningBox.classList.remove('d-none');
                 submitBtn.disabled = true;
             } else {
@@ -205,7 +205,7 @@
         });
 
         // Re-check stock for every row whenever the branch changes
-        // (Owner/Co-Owner only — this is how they'd cover a branch or
+        // (Owner/Manager only — this is how they'd cover a branch or
         // compare availability before deciding where to sell from).
         const branchSelect = document.getElementById('branch-select');
         if (branchSelect) {

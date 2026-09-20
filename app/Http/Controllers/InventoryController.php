@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Per-branch stock view + manual restock (e.g. after a supplier delivery
- * is received and audited by the Co-Owner — see Chapter 1, Purchasing and
+ * is received and audited by the Manager — see Chapter 1, Purchasing and
  * Supplier Management).
  */
 class InventoryController extends Controller
@@ -19,7 +19,7 @@ class InventoryController extends Controller
 
         $query = Inventory::with(['product', 'branch']);
 
-        // Staff only see their own branch; Owner/Co-Owner see all
+        // Staff only see their own branch; Owner/Manager see all
         // (optionally filtered via a ?branch_id= query param).
         if ($user->isStaff()) {
             $query->where('branch_id', $user->branch_id);

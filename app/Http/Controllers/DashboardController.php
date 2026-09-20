@@ -12,7 +12,7 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        // Owner/Co-Owner see all branches; Staff see only their own branch.
+        // Owner/Manager see all branches; Staff see only their own branch.
         $salesQuery = Sale::query()->whereDate('sold_at', today());
         $inventoryQuery = Inventory::query()->with(['product', 'branch']);
 

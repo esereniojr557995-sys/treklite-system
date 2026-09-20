@@ -40,22 +40,21 @@ class User extends Authenticatable
     // --- Role helpers used throughout controllers/views/middleware ---
     //
     // Org chart hierarchy (Chapter 1): Owner sits at the top and holds
-    // primary authority; the Co-Owner is positioned one level below and
+    // primary authority; the Manager is positioned one level below and
     // is authorized to act on the Owner's behalf when needed; Staff
-    // independently run day-to-day operations at the Matina/Malita
-    // branches. Owner and Co-Owner share the same *system* permissions
-    // below (both need full access to fulfill "acting on the Owner's
-    // behalf"), even though the Owner remains the final authority on the
-    // business itself.
+    // independently run day-to-day operations at the Matina branch.
+    // Owner and Manager share the same *system* permissions below (both
+    // need full access to fulfill "acting on the Owner's behalf"), even
+    // though the Owner remains the final authority on the business itself.
 
     public function isOwner(): bool
     {
         return $this->role === 'owner';
     }
 
-    public function isCoOwner(): bool
+    public function isManager(): bool
     {
-        return $this->role === 'co_owner';
+        return $this->role === 'manager';
     }
 
     public function isStaff(): bool
@@ -63,9 +62,9 @@ class User extends Authenticatable
         return $this->role === 'staff';
     }
 
-    /** Owner and Co-Owner both get full, all-branch access per Chapter 1. */
+    /** Owner and Manager both get full, all-branch access per Chapter 1. */
     public function hasFullAccess(): bool
     {
-        return in_array($this->role, ['owner', 'co_owner']);
+        return in_array($this->role, ['owner', 'manager']);
     }
 }
