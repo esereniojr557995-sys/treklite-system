@@ -2,30 +2,28 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
-    use HasFactory;
+    protected $fillable = ['name', 'category', 'brand', 'description', 'image_path', 'price'];
 
-    protected $fillable = ['sku', 'name', 'category', 'price', 'low_stock_threshold'];
+    protected $casts = ['price' => 'decimal:2'];
 
-    protected function casts(): array
+    public function variants(): HasMany
     {
-        return [
-            'price' => 'decimal:2',
-        ];
+        return $this->hasMany(ProductVariant::class);
     }
 
-    public function inventories(): HasMany
+    public function getImageUrlAttribute(): ?string
     {
-        return $this->hasMany(Inventory::class);
+        return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
     }
 
-    public function saleItems(): HasMany
+    public function getTotalStockAttribute(): int
     {
-        return $this->hasMany(SaleItem::class);
+        return (int) $this->variants->sum('quantity');
     }
 }

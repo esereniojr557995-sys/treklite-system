@@ -132,42 +132,38 @@
     </style>
 </head>
 <body>
+    
+    @php
+    $isOwner = auth()->user()?->hasFullAccess();
 
-@php
-    $navItems = [
-        ['route' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'bi-speedometer2'],
-        ['route' => 'sales.index', 'label' => 'Sales', 'icon' => 'bi-receipt'],
-        ['route' => 'sales.create', 'label' => 'New Sale', 'icon' => 'bi-cart-plus'],
-        ['route' => 'inventory.index', 'label' => 'Inventory', 'icon' => 'bi-box-seam'],
-    ];
-    $adminNavItems = [
-        ['route' => 'products.index', 'label' => 'Products', 'icon' => 'bi-tags'],
-        ['route' => 'reports.sales', 'label' => 'Reports', 'icon' => 'bi-graph-up'],
-    ];
+    // Dashboard first, then the major transactions (Sales, Inventory), then master data and reports
+    $navItems = $isOwner
+        ? [
+            ['route' => 'dashboard',       'label' => 'Dashboard',     'icon' => 'bi-speedometer2', 'match' => 'dashboard'],
+            ['route' => 'sales.create',    'label' => 'New Sale',      'icon' => 'bi-cart-plus',    'match' => 'sales.create'],
+            ['route' => 'sales.index',     'label' => 'Sales Records', 'icon' => 'bi-receipt',      'match' => 'sales.index'],
+            ['route' => 'inventory.index', 'label' => 'Inventory',     'icon' => 'bi-box-seam',     'match' => 'inventory.*'],
+            ['route' => 'products.index',  'label' => 'Products',      'icon' => 'bi-tags',         'match' => 'products.*'],
+            ['route' => 'reports.sales',   'label' => 'Reports',       'icon' => 'bi-graph-up',     'match' => 'reports.*'],
+        ]
+        : [
+            ['route' => 'sales.create',    'label' => 'New Sale',      'icon' => 'bi-cart-plus',    'match' => 'sales.create'],
+            ['route' => 'sales.index',     'label' => 'Sales Records', 'icon' => 'bi-receipt',      'match' => 'sales.index'],
+            ['route' => 'inventory.index', 'label' => 'Stock Check',   'icon' => 'bi-box-seam',     'match' => 'inventory.*'],
+        ];
 @endphp
 
 <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
 <aside class="sidebar" id="sidebar">
     <div class="brand">Treklite Outdoor</div>
-
     <nav class="nav flex-column mt-2">
         @foreach ($navItems as $item)
             <a href="{{ route($item['route']) }}"
-               class="nav-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
+               class="nav-link {{ request()->routeIs($item['match']) ? 'active' : '' }}">
                 <i class="bi {{ $item['icon'] }}"></i> {{ $item['label'] }}
             </a>
         @endforeach
-
-        @if (auth()->user()?->hasFullAccess())
-            <div class="nav-section-label">Management</div>
-            @foreach ($adminNavItems as $item)
-                <a href="{{ route($item['route']) }}"
-                   class="nav-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
-                    <i class="bi {{ $item['icon'] }}"></i> {{ $item['label'] }}
-                </a>
-            @endforeach
-        @endif
     </nav>
 
     <div class="sidebar-footer">
@@ -175,9 +171,6 @@
         <div class="fw-semibold">{{ auth()->user()?->name }}</div>
         <div class="mb-2">
             <span class="badge bg-light text-dark">{{ auth()->user()?->role }}</span>
-            @if (auth()->user()?->branch)
-                <span class="badge bg-dark">{{ auth()->user()->branch->name }}</span>
-            @endif
         </div>
         <form action="{{ route('logout') }}" method="POST">
             @csrf
@@ -229,6 +222,7 @@
     toggleBtn?.addEventListener('click', toggleSidebar);
     backdrop?.addEventListener('click', toggleSidebar);
 </script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>

@@ -1,18 +1,20 @@
 @extends('layouts.app')
 
+@section('title', 'Sales Records')
+
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0">Sales</h3>
-        <a href="{{ route('sales.create') }}" class="btn btn-success">+ Record Sale</a>
+        <h3 class="mb-0">Sales Records</h3>
+        <a href="{{ route('sales.create') }}" class="btn btn-success">+ New Sale</a>
     </div>
 
     <div class="card shadow-sm">
-        <table class="table mb-0">
+        <table class="table table-hover mb-0 align-middle">
             <thead>
                 <tr>
                     <th>Invoice #</th>
                     <th>Date</th>
-                    <th>Branch</th>
+                    <th>Customer</th>
                     <th>Processed By</th>
                     <th>Payment</th>
                     <th class="text-end">Total</th>
@@ -23,9 +25,14 @@
                     <tr>
                         <td><a href="{{ route('sales.show', $sale) }}">{{ $sale->invoice_number }}</a></td>
                         <td>{{ $sale->sold_at->format('M d, Y h:i A') }}</td>
-                        <td>{{ $sale->branch->name }}</td>
+                        <td>{{ $sale->customer_name }}</td>
                         <td>{{ $sale->user->name }}</td>
-                        <td class="text-capitalize">{{ $sale->payment_method }}</td>
+                        <td>
+                            {{ $sale->payment_label }}
+                            @if ($sale->payment_reference)
+                                <div class="small text-muted">Ref: {{ $sale->payment_reference }}</div>
+                            @endif
+                        </td>
                         <td class="text-end">₱{{ number_format($sale->total_amount, 2) }}</td>
                     </tr>
                 @empty

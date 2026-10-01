@@ -1,40 +1,45 @@
 <?php
 
-use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SaleController;
+use App\Http\Middleware\OwnerOnly;
 use Illuminate\Support\Facades\Route;
 
-// --- Guest routes ---
-Route::get('/', fn () => redirect()->route('login'));
-Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
+// Only for people who are not logged in
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+});
 
-// --- Authenticated routes (any logged-in role) ---
+// Must be logged in
 Route::middleware('auth')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Sales / POS — every role can record a sale at their own branch
-    Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
-    Route::get('/sales/create', [SaleController::class, 'create'])->name('sales.create');
+    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+    Route::get('/', fn () => redirect()->route('dashboard'));
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');   // staff are redirected to New Sale
+
+    // Owner and Staff
+    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');   // stock lookup
+    Route::get('/sales/new', [SaleController::class, 'create'])->name('sales.create');
     Route::post('/sales', [SaleController::class, 'store'])->name('sales.store');
+    Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->name('sales.show');
 
-    // Inventory viewing — every role can view stock (staff see only their branch)
-    Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
-
-    // --- Owner / Manager only ---
-    Route::middleware('role:owner,manager')->group(function () {
+    // Owner only
+    Route::middleware(OwnerOnly::class)->group(function () {
         Route::get('/products', [ProductController::class, 'index'])->name('products.index');
         Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
         Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+        Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
 
-        Route::post('/inventory/{inventory}/restock', [InventoryController::class, 'restock'])
-            ->name('inventory.restock');
+        Route::post('/inventory/{variant}/receive', [InventoryController::class, 'receive'])->name('inventory.receive');
+        Route::post('/inventory/{variant}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');
 
         Route::get('/reports/sales', [ReportController::class, 'sales'])->name('reports.sales');
     });

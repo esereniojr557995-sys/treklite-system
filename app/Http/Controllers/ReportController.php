@@ -3,29 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Models\Sale;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
-/**
- * Covers the "Generate sales and inventory reports" objective.
- * This starter gives you a simple on-screen date-range report;
- * wiring up PDF/Excel export (e.g. via barryvdh/laravel-dompdf or
- * maatwebsite/excel) is a good next milestone once you have internet
- * access to install those packages via Composer.
- */
 class ReportController extends Controller
 {
     public function sales(Request $request)
     {
-        $from = $request->date('from') ?? now()->startOfMonth();
-        $to = $request->date('to') ?? now();
+        $from = Carbon::parse($request->query('from', now()->startOfMonth()->toDateString()))->startOfDay();
+        $to   = Carbon::parse($request->query('to', now()->toDateString()))->endOfDay();
 
-        $sales = Sale::with(['branch', 'items.product'])
+        $sales = Sale::with('user')
             ->whereBetween('sold_at', [$from, $to])
-            ->latest('sold_at')
+            ->orderBy('sold_at')
             ->get();
 
         $totalRevenue = $sales->sum('total_amount');
+        $byPayment    = $sales->groupBy('payment_method')->map(fn ($g) => [
+            'count' => $g->count(),
+            'total' => $g->sum('total_amount'),
+        ]);
 
-        return view('reports.sales', compact('sales', 'totalRevenue', 'from', 'to'));
+        return view('reports.sales', compact('sales', 'from', 'to', 'totalRevenue', 'byPayment'));
     }
 }

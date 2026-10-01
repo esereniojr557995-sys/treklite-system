@@ -2,168 +2,142 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Inventory;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Sale;
-use App\Models\SaleItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-/**
- * This is the digital replacement for the paper logbook described in
- * Chapter 1 (Sales Transaction Process). Recording a sale here:
- *   1. Generates an invoice number (replaces the handwritten sales invoice)
- *   2. Deducts sold quantities from that branch's inventory in real time,
- *      resolving Problem 1 (Difficulty in Monitoring and Verifying
- *      Inventory) from the Statement of the Problem
- *   3. Blocks the sale if stock is insufficient, so the recorded quantity
- *      can never drift from actual stock the way it did on paper
- *   4. Shows live per-branch stock on the POS screen itself (see create()),
- *      resolving Problem 3 (Delay in Customer Service When Checking Stock
- *      Availability)
- */
 class SaleController extends Controller
 {
-    public function index(Request $request)
-    {
-        $user = Auth::user();
+    public function index()
+{
+    $sales = Sale::with('user')
+        ->when(! auth()->user()->hasFullAccess(), fn ($q) => $q->where('user_id', auth()->id()))
+        ->latest('sold_at')
+        ->paginate(20);
 
-        $query = Sale::with(['branch', 'user'])->latest('sold_at');
+    return view('sales.index', compact('sales'));
+}
 
-        if ($user->isStaff()) {
-            $query->where('branch_id', $user->branch_id);
-        }
-
-        $sales = $query->paginate(20);
-
-        return view('sales.index', compact('sales'));
-    }
-
-    /**
-     * Shows the POS/sale screen. Every product is returned together with
-     * its current per-branch stock quantity, so the person on duty can see
-     * live availability on screen instead of checking the paper inventory
-     * sheet or physically walking to the shelf.
-     *
-     * This directly implements Specific Objective 3 (real-time stock
-     * availability lookup) and resolves Problem 3 in the Statement of the
-     * Problem: "Delay in Customer Service When Checking Stock Availability."
-     */
     public function create()
     {
-        $user = Auth::user();
-
-        // For Staff, stock is only relevant for their own branch. For
-        // Owner/Manager, include stock for every branch so the branch
-        // dropdown can be switched without reloading the page.
-        $products = Product::orderBy('name')
-            ->with(['inventories' => function ($query) use ($user) {
-                if ($user->isStaff()) {
-                    $query->where('branch_id', $user->branch_id);
-                }
-            }])
+        $products = Product::with('variants')
+            ->whereHas('variants')
+            ->orderBy('name')
             ->get()
-            ->map(function ($product) {
-                return [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'price' => (float) $product->price,
-                    // stockByBranch: { branch_id: quantity, ... }
-                    'stockByBranch' => $product->inventories->mapWithKeys(
-                        fn ($inv) => [$inv->branch_id => $inv->quantity]
-                    ),
-                ];
-            });
+            ->map(fn ($p) => [
+                'id'       => $p->id,
+                'name'     => $p->name,
+                'category' => $p->category,
+                'brand'    => $p->brand,
+                'image'    => $p->image_url,
+                'variants' => $p->variants->map(fn ($v) => [
+                    'id'    => $v->id,
+                    'sku'   => $v->sku,
+                    'size'  => $v->size,
+                    'color' => $v->color,
+                    'label' => $v->label,
+                    'price' => (float) ($v->price ?? $p->price),
+                    'stock' => (int) $v->quantity,
+                ])->values(),
+            ])->values();
 
-        return view('sales.create', [
-            'products' => $products,
-            'defaultBranchId' => $user->branch_id,
-        ]);
+        $categories = Product::whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
+
+        // Optional: put your shop's static QR Ph / GCash QR image here to show it at checkout.
+        $paymentQr = file_exists(public_path('images/payment-qr.png')) ? asset('images/payment-qr.png') : null;
+
+        return view('sales.create', compact('products', 'categories', 'paymentQr'));
     }
 
     public function store(Request $request)
     {
-        $user = Auth::user();
-
         $data = $request->validate([
-            'payment_method' => ['required', 'in:cash,gcash,paymaya,card'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'customer_name'      => ['nullable', 'string', 'max:255'],
+            'customer_address'   => ['nullable', 'string', 'max:255'],
+            'customer_contact'   => ['nullable', 'string', 'max:50'],
+            'payment_method'     => ['required', 'in:cash,gcash,paymaya,card'],
+            'payment_reference'  => ['nullable', 'required_unless:payment_method,cash', 'string', 'max:100', 'unique:sales,payment_reference'],
+            'payment_proof'      => ['nullable', 'image', 'max:4096'],
+            'amount_tendered'    => ['nullable', 'numeric', 'min:0'],
+            'items'              => ['required', 'array', 'min:1'],
+            'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
+            'items.*.quantity'   => ['required', 'integer', 'min:1'],
+        ], [
+            'payment_reference.required_unless' => 'Enter the reference number shown on the customer\'s payment confirmation.',
+            'payment_reference.unique'          => 'This reference number was already used on another sale.',
         ]);
 
-        // Staff can only sell from their own branch; Owner/Manager may
-        // pass a branch_id to record a sale at any branch — this models
-        // the Owner/Manager personally stepping in to cover a branch when
-        // its assigned staff member is unavailable (see Chapter 1,
-        // Organizational Chart: branch continuity).
-        $branchId = $user->isStaff() ? $user->branch_id : $request->input('branch_id', $user->branch_id);
+        $sale = DB::transaction(function () use ($data, $request) {
+            // Merge duplicate variants, then lock them so two sales cannot take the same stock.
+            $lines = collect($data['items'])->groupBy('variant_id')->map(fn ($g) => (int) $g->sum('quantity'));
 
-        $sale = DB::transaction(function () use ($data, $branchId, $user) {
-            $total = 0;
-            $lineItems = [];
+            $variants = ProductVariant::with('product')
+                ->whereIn('id', $lines->keys())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
 
-            foreach ($data['items'] as $item) {
-                $product = Product::findOrFail($item['product_id']);
-
-                $inventory = Inventory::where('product_id', $product->id)
-                    ->where('branch_id', $branchId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (! $inventory || $inventory->quantity < $item['quantity']) {
-                    throw ValidationException::withMessages([
-                        'items' => "Not enough stock for {$product->name} at this branch.",
-                    ]);
+            $short = [];
+            $total = 0.0;
+            foreach ($lines as $id => $qty) {
+                $v = $variants[$id];
+                if ($qty > $v->quantity) {
+                    $short[] = $v->product->name . ' (' . $v->label . '): only ' . $v->quantity . ' left';
                 }
-
-                $inventory->decrement('quantity', $item['quantity']);
-
-                $subtotal = $product->price * $item['quantity'];
-                $total += $subtotal;
-
-                $lineItems[] = [
-                    'product_id' => $product->id,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $product->price,
-                    'subtotal' => $subtotal,
-                ];
+                $total += $v->selling_price * $qty;
+            }
+            if ($short) {
+                throw ValidationException::withMessages(['items' => ['Not enough stock for: ' . implode('; ', $short)]]);
             }
 
+            $isCash   = $data['payment_method'] === 'cash';
+            $tendered = $isCash ? (float) ($data['amount_tendered'] ?? $total) : $total;
+            if ($tendered + 0.001 < $total) {
+                throw ValidationException::withMessages(['amount_tendered' => ['The amount received is less than the total.']]);
+            }
+
+            $prefix = 'INV-' . now()->format('Ymd');
+            $seq    = Sale::whereDate('sold_at', today())->lockForUpdate()->count() + 1;
+
             $sale = Sale::create([
-                'invoice_number' => $this->generateInvoiceNumber(),
-                'branch_id' => $branchId,
-                'user_id' => $user->id,
-                'payment_method' => $data['payment_method'],
-                'total_amount' => $total,
-                'sold_at' => now(),
+                'invoice_number'     => sprintf('%s-%04d', $prefix, $seq),
+                'user_id'            => auth()->id(),
+                'customer_name'      => $data['customer_name'] ?: 'Walk-in Customer',
+                'customer_address'   => $data['customer_address'] ?? null,
+                'customer_contact'   => $data['customer_contact'] ?? null,
+                'payment_method'     => $data['payment_method'],
+                'payment_reference'  => $isCash ? null : $data['payment_reference'],
+                'payment_proof_path' => $request->file('payment_proof')?->store('payment-proofs', 'public'),
+                'amount_tendered'    => $tendered,
+                'change_amount'      => max(0, $tendered - $total),
+                'total_amount'       => $total,
+                'sold_at'            => now(),
             ]);
 
-            foreach ($lineItems as $line) {
-                SaleItem::create($line + ['sale_id' => $sale->id]);
+            foreach ($lines as $id => $qty) {
+                $v = $variants[$id];
+                $sale->items()->create([
+                    'variant_id' => $v->id,
+                    'quantity'   => $qty,
+                    'unit_price' => $v->selling_price,
+                    'subtotal'   => $v->selling_price * $qty,
+                ]);
+                $v->decrement('quantity', $qty);
             }
 
             return $sale;
         });
 
-        return redirect()->route('sales.show', $sale)->with('status', 'Sale recorded.');
+        return redirect()->route('sales.show', $sale)->with('status', 'Sale recorded. Invoice ' . $sale->invoice_number . ' is ready to print.');
     }
 
     public function show(Sale $sale)
     {
-        $sale->load(['items.product', 'branch', 'user']);
+        $sale->load('items.variant.product', 'user');
 
         return view('sales.show', compact('sale'));
-    }
-
-    private function generateInvoiceNumber(): string
-    {
-        // e.g. INV-20260909-0007
-        $today = now()->format('Ymd');
-        $countToday = Sale::whereDate('sold_at', now())->count() + 1;
-
-        return sprintf('INV-%s-%04d', $today, $countToday);
     }
 }
