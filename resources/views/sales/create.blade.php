@@ -70,7 +70,7 @@
                 <div class="card shadow-sm mb-3">
                     <div class="card-body">
                         <div class="fw-semibold small text-uppercase text-muted mb-1">Sold to</div>
-                        <input type="text" name="customer_name" class="form-control form-control-sm mb-1" placeholder="Customer name (blank = Walk-in)" value="{{ old('customer_name') }}">
+                        <input type="text" name="customer_name" class="form-control form-control-sm mb-1" placeholder="Customer name" value="{{ old('customer_name') }}">
                         <input type="text" name="customer_address" class="form-control form-control-sm mb-1" placeholder="Address" value="{{ old('customer_address') }}">
                         <input type="text" name="customer_contact" class="form-control form-control-sm mb-3" placeholder="Contact number" value="{{ old('customer_contact') }}">
 
