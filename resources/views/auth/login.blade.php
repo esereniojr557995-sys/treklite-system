@@ -17,6 +17,10 @@
                 <div class="text-muted small">Sales &amp; Inventory System</div>
             </div>
 
+            @if (session('status'))
+                <div class="alert alert-success small">{{ session('status') }}</div>
+            @endif
+
             <form method="POST" action="{{ route('login') }}">
                 @csrf
 

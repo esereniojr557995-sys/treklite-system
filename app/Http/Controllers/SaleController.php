@@ -12,14 +12,14 @@ use Illuminate\Validation\ValidationException;
 class SaleController extends Controller
 {
     public function index()
-{
-    $sales = Sale::with('user')
-        ->when(! auth()->user()->hasFullAccess(), fn ($q) => $q->where('user_id', auth()->id()))
-        ->latest('sold_at')
-        ->paginate(20);
+    {
+        $sales = Sale::with('user')
+            ->when(! auth()->user()->hasFullAccess(), fn ($q) => $q->where('user_id', auth()->id()))
+            ->latest('sold_at')
+            ->paginate(20);
 
-    return view('sales.index', compact('sales'));
-}
+        return view('sales.index', compact('sales'));
+    }
 
     public function create()
     {
@@ -136,6 +136,11 @@ class SaleController extends Controller
 
     public function show(Sale $sale)
     {
+        abort_unless(
+            auth()->user()->hasFullAccess() || $sale->user_id === auth()->id(),
+            403
+        );
+
         $sale->load('items.variant.product', 'user');
 
         return view('sales.show', compact('sale'));

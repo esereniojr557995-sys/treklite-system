@@ -59,6 +59,11 @@
         <h3 class="mb-0">Sales Report</h3>
         <button onclick="window.print()" class="btn btn-outline-dark no-print"><i class="bi bi-printer"></i> Print</button>
     </div>
+    
+    <ul class="nav nav-tabs mb-3 no-print">
+    <li class="nav-item"><a class="nav-link active" href="{{ route('reports.sales') }}">Sales Report</a></li>
+    <li class="nav-item"><a class="nav-link" href="{{ route('reports.inventory') }}">Inventory Report</a></li>
+    </ul>
 
     <form method="GET" class="row g-2 mb-4 no-print">
         <div class="col-auto"><input type="date" name="from" class="form-control" value="{{ $from->format('Y-m-d') }}"></div>

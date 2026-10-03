@@ -145,6 +145,8 @@
             ['route' => 'inventory.index', 'label' => 'Inventory',     'icon' => 'bi-box-seam',     'match' => 'inventory.*'],
             ['route' => 'products.index',  'label' => 'Products',      'icon' => 'bi-tags',         'match' => 'products.*'],
             ['route' => 'reports.sales',   'label' => 'Reports',       'icon' => 'bi-graph-up',     'match' => 'reports.*'],
+            ['route' => 'users.index',  'label' => 'Users',  'icon' => 'bi-people',          'match' => 'users.*'],
+            ['route' => 'backup.index', 'label' => 'Backup', 'icon' => 'bi-cloud-arrow-down','match' => 'backup.*'],
         ]
         : [
             ['route' => 'sales.create',    'label' => 'New Sale',      'icon' => 'bi-cart-plus',    'match' => 'sales.create'],
