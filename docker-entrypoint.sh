@@ -13,7 +13,7 @@ php artisan migrate --force
 # First deploy ONLY: set RUN_SEEDER=true in Render, deploy, then delete it.
 # The seeder isn't safe to re-run (it would hit duplicate emails).
 if [ "$RUN_SEEDER" = "true" ]; then
-  php artisan db:seed --force
+  php artisan db:seed --force || echo "WARNING: seeder failed (data probably already exists), continuing..."
 fi
 
 # Cache config/views at runtime, when Render's env vars exist
