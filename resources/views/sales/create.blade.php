@@ -87,6 +87,8 @@
                                 <div class="small text-muted">Customer scans this QR, then shows the payment confirmation.</div>
                             </div>
                         @endif
+                        <label class="form-label small mb-0">Reference number <span class="text-danger">*</span></label>
+                        <input type="text" name="payment_reference" id="payment-ref" class="form-control form-control-sm mb-2" placeholder="Reference no. from the payment confirmation" maxlength="100" value="{{ old('payment_reference') }}">
                         <label class="form-label small mb-0">Photo of the payment confirmation <span class="text-danger">*</span></label>
                         <input type="file" name="payment_proof" id="payment-proof" accept="image/*" capture="environment" class="form-control form-control-sm mb-1">
                         <div class="small text-muted mb-1">Take a clear photo of the customer's confirmation screen. The amount paid must be visible and must match the total.</div>
@@ -156,7 +158,7 @@
                 if (v.color) o['Color'] = String(v.color);
                 if (v.size)  o['Size']  = String(v.size);
             }
-            return Object.keys(o).length ? o : { 'Option': String(v.label ?? v.sku ?? 'Standard') };
+            return Object.keys(o).length ? o : { 'Option': String(v.label ?? 'Standard') };
         };
 
         PRODUCTS.forEach(p => {
@@ -397,12 +399,13 @@
             $('cash-box').classList.toggle('d-none', !cash);
             $('digital-box').classList.toggle('d-none', cash);
             $('payment-proof').required = !cash;
+            $('payment-ref').required = !cash;
             updateState();
         }
 
         /* The sale can only be completed when the cart has items and the payment is valid:
            cash  -> the amount received is not less than the total (more is fine, change is returned)
-           other -> a photo of the payment confirmation is attached */
+           other -> the reference number is entered and a photo of the payment confirmation is attached */
         function updateState() {
             const total = cartTotal();
             const cash = $('payment-method').value === 'cash';
@@ -419,7 +422,7 @@
                 $('cash-msg').innerHTML = msg ? '<span class="text-danger">' + msg + '</span>' : 'Change: <strong>' + peso(change) + '</strong>';
             } else {
                 $('digital-amount').textContent = peso(total);
-                if (cart.length && !$('payment-proof').files.length) { ok = false; }
+                if (cart.length && (!$('payment-ref').value.trim() || !$('payment-proof').files.length)) { ok = false; }
             }
             $('submit-btn').disabled = !ok;
         }
@@ -427,6 +430,7 @@
         $('payment-method').addEventListener('change', togglePayment);
         $('tendered').addEventListener('input', updateState);
         $('payment-proof').addEventListener('change', updateState);
+        $('payment-ref').addEventListener('input', updateState);
         $('exact-btn').addEventListener('click', () => { $('tendered').value = cartTotal().toFixed(2); updateState(); });
 
         /* ---------- submit ---------- */
