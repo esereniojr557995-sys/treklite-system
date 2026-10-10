@@ -12,16 +12,44 @@ use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $products = Product::with('variants')->orderBy('name')->paginate(20);
+        $q        = trim((string) $request->query('q'));
+        $category = (string) $request->query('category');
+        $brand    = (string) $request->query('brand');
 
-        return view('products.index', compact('products'));
+        $products = Product::with('variants')
+            ->when($q !== '', fn ($query) => $query->where(function ($w) use ($q) {
+                $w->where('name', 'like', "%{$q}%")
+                  ->orWhere('brand', 'like', "%{$q}%")
+                  ->orWhere('category', 'like', "%{$q}%");
+            }))
+            ->when($category !== '', fn ($query) => $query->where('category', $category))
+            ->when($brand === '_none', fn ($query) => $query->where(fn ($w) => $w->whereNull('brand')->orWhere('brand', '')))
+            ->when($brand !== '' && $brand !== '_none', fn ($query) => $query->where('brand', $brand))
+            ->orderBy('brand')
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        $categories = Product::whereNotNull('category')->where('category', '!=', '')->distinct()->orderBy('category')->pluck('category');
+        $brands     = Product::whereNotNull('brand')->where('brand', '!=', '')->distinct()->orderBy('brand')->pluck('brand');
+
+        return view('products.index', compact('products', 'q', 'category', 'brand', 'categories', 'brands'));
     }
 
     public function create()
     {
-        return view('products.form', ['product' => new Product()]);
+        return view('products.form', ['product' => new Product()] + $this->suggestions());
+    }
+
+    /** Existing categories and brands, offered as suggestions so the same name is not typed two ways. */
+    private function suggestions(): array
+    {
+        return [
+            'categories' => Product::whereNotNull('category')->where('category', '!=', '')->distinct()->orderBy('category')->pluck('category'),
+            'brands'     => Product::whereNotNull('brand')->where('brand', '!=', '')->distinct()->orderBy('brand')->pluck('brand'),
+        ];
     }
 
     public function store(Request $request)
@@ -40,7 +68,7 @@ class ProductController extends Controller
     {
         $product->load('variants');
 
-        return view('products.form', compact('product'));
+        return view('products.form', compact('product') + $this->suggestions());
     }
 
     public function update(Request $request, Product $product)
@@ -70,7 +98,6 @@ class ProductController extends Controller
             'image'                        => ['nullable', 'image', 'max:4096'],
             'variants'                     => ['required', 'array', 'min:1'],
             'variants.*.id'                => ['nullable', 'integer'],
-            'variants.*.sku'               => ['required', 'string', 'max:255'],
             'variants.*.size'              => ['nullable', 'string', 'max:50'],
             'variants.*.color'             => ['nullable', 'string', 'max:50'],
             'variants.*.price'             => ['nullable', 'numeric', 'min:0'],
@@ -92,18 +119,22 @@ class ProductController extends Controller
 
     private function saveVariants(Product $product, array $rows): void
     {
+        // The same size + color cannot be entered twice for one product.
+        $seen = [];
+        foreach ($rows as $i => $row) {
+            $key = mb_strtolower(trim(($row['size'] ?? '') . '|' . ($row['color'] ?? '')));
+            if (isset($seen[$key])) {
+                throw ValidationException::withMessages(["variants.$i.size" => 'This size / color is entered twice. Combine them into one row.']);
+            }
+            $seen[$key] = true;
+        }
+
         foreach ($rows as $i => $row) {
             $id = $row['id'] ?? null;
 
-            $skuTaken = ProductVariant::where('sku', $row['sku'])->when($id, fn ($q) => $q->where('id', '!=', $id))->exists();
-            if ($skuTaken) {
-                throw ValidationException::withMessages(["variants.$i.sku" => 'The SKU ' . $row['sku'] . ' is already used.']);
-            }
-
             $attrs = [
-                'sku'                 => $row['sku'],
-                'size'                => $row['size'] ?? null,
-                'color'               => $row['color'] ?? null,
+                'size'                => ($row['size'] ?? '') === '' ? null : $row['size'],
+                'color'               => ($row['color'] ?? '') === '' ? null : $row['color'],
                 'price'               => ($row['price'] ?? '') === '' ? null : $row['price'],
                 'low_stock_threshold' => $row['low_stock_threshold'],
             ];
@@ -113,13 +144,14 @@ class ProductController extends Controller
                 $product->variants()->whereKey($id)->update($attrs);
             } else {
                 $opening = (int) ($row['quantity'] ?? 0);
-                $variant = $product->variants()->create($attrs + ['quantity' => $opening]);
+                $variant = $product->variants()->create($attrs + ['sku' => $this->makeSku($product, $attrs), 'quantity' => $opening]);
 
                 if ($opening > 0) {
                     StockMovement::create([
                         'variant_id'      => $variant->id,
                         'user_id'         => auth()->id(),
                         'type'            => 'receive',
+                        'quantity_before' => 0,
                         'quantity_change' => $opening,
                         'quantity_after'  => $opening,
                         'note'            => 'Opening stock',
@@ -127,5 +159,21 @@ class ProductController extends Controller
                 }
             }
         }
+    }
+
+    /** The system keeps an internal code for each variant (staff never type it). */
+    private function makeSku(Product $product, array $attrs): string
+    {
+        $base = strtoupper(\Illuminate\Support\Str::limit(\Illuminate\Support\Str::slug($product->name, ''), 8, ''))
+            . '-' . strtoupper(\Illuminate\Support\Str::slug(($attrs['size'] ?? '') . ($attrs['color'] ?? ''), ''));
+        $base = rtrim($base, '-') ?: 'ITEM';
+
+        $sku = $base;
+        $n   = 2;
+        while (ProductVariant::where('sku', $sku)->exists()) {
+            $sku = $base . '-' . $n++;
+        }
+
+        return $sku;
     }
 }

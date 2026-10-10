@@ -5,20 +5,39 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sale;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
-    public function index()
+    /** Sales Records with search, date range, cashier and payment filters. */
+    public function index(Request $request)
     {
-        $sales = Sale::with('user')
-            ->when(! auth()->user()->hasFullAccess(), fn ($q) => $q->where('user_id', auth()->id()))
-            ->latest('sold_at')
-            ->paginate(20);
+        $q       = trim((string) $request->query('q'));
+        $from    = (string) $request->query('from');
+        $to      = (string) $request->query('to');
+        $userId  = (string) $request->query('user_id');
+        $payment = (string) $request->query('payment');
 
-        return view('sales.index', compact('sales'));
+        $query = Sale::query()
+            ->when($q !== '', fn ($s) => $s->where(fn ($w) => $w
+                ->where('invoice_number', 'like', "%{$q}%")
+                ->orWhere('customer_name', 'like', "%{$q}%")
+                ->orWhere('customer_contact', 'like', "%{$q}%")))
+            ->when($from !== '', fn ($s) => $s->whereDate('sold_at', '>=', $from))
+            ->when($to !== '', fn ($s) => $s->whereDate('sold_at', '<=', $to))
+            ->when($userId !== '', fn ($s) => $s->where('user_id', $userId))
+            ->when($payment !== '', fn ($s) => $s->where('payment_method', $payment));
+
+        $count = (clone $query)->count();
+        $total = (float) (clone $query)->sum('total_amount');
+
+        $sales    = $query->with('user')->latest('sold_at')->paginate(20)->withQueryString();
+        $cashiers = User::orderBy('name')->get(['id', 'name']);
+
+        return view('sales.index', compact('sales', 'cashiers', 'q', 'from', 'to', 'userId', 'payment', 'count', 'total'));
     }
 
     public function create()
@@ -58,16 +77,15 @@ class SaleController extends Controller
             'customer_name'      => ['nullable', 'string', 'max:255'],
             'customer_address'   => ['nullable', 'string', 'max:255'],
             'customer_contact'   => ['nullable', 'string', 'max:50'],
-            'payment_method'     => ['required', 'in:cash,gcash,paymaya,card'],
-            'payment_reference'  => ['nullable', 'required_unless:payment_method,cash', 'string', 'max:100', 'unique:sales,payment_reference'],
-            'payment_proof'      => ['nullable', 'image', 'max:4096'],
-            'amount_tendered'    => ['nullable', 'numeric', 'min:0'],
+            'payment_method'     => ['required', 'in:cash,gcash,bank_transfer'],
+            'payment_proof'      => ['nullable', 'required_unless:payment_method,cash', 'image', 'max:4096'],
+            'amount_tendered'    => ['nullable', 'required_if:payment_method,cash', 'numeric', 'min:0'],
             'items'              => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
             'items.*.quantity'   => ['required', 'integer', 'min:1'],
         ], [
-            'payment_reference.required_unless' => 'Enter the reference number shown on the customer\'s payment confirmation.',
-            'payment_reference.unique'          => 'This reference number was already used on another sale.',
+            'payment_proof.required_unless' => 'Attach a photo of the payment confirmation (it must show the amount paid).',
+            'amount_tendered.required_if'   => 'Enter the amount received from the customer.',
         ]);
 
         $sale = DB::transaction(function () use ($data, $request) {
@@ -94,9 +112,11 @@ class SaleController extends Controller
             }
 
             $isCash   = $data['payment_method'] === 'cash';
-            $tendered = $isCash ? (float) ($data['amount_tendered'] ?? $total) : $total;
+            // Cash: the amount received must cover the total (more is fine, the change is returned).
+            // GCash / bank transfer: the exact total is paid and the photo of the confirmation is the proof.
+            $tendered = $isCash ? (float) $data['amount_tendered'] : $total;
             if ($tendered + 0.001 < $total) {
-                throw ValidationException::withMessages(['amount_tendered' => ['The amount received is less than the total.']]);
+                throw ValidationException::withMessages(['amount_tendered' => ['The amount received (₱' . number_format($tendered, 2) . ') is less than the total (₱' . number_format($total, 2) . '). The sale was not processed.']]);
             }
 
             $prefix = 'INV-' . now()->format('Ymd');
@@ -109,7 +129,7 @@ class SaleController extends Controller
                 'customer_address'   => $data['customer_address'] ?? null,
                 'customer_contact'   => $data['customer_contact'] ?? null,
                 'payment_method'     => $data['payment_method'],
-                'payment_reference'  => $isCash ? null : $data['payment_reference'],
+                'payment_reference'  => null,
                 'payment_proof_path' => $request->file('payment_proof')?->store('payment-proofs', 'public'),
                 'amount_tendered'    => $tendered,
                 'change_amount'      => max(0, $tendered - $total),
@@ -136,11 +156,6 @@ class SaleController extends Controller
 
     public function show(Sale $sale)
     {
-        abort_unless(
-            auth()->user()->hasFullAccess() || $sale->user_id === auth()->id(),
-            403
-        );
-
         $sale->load('items.variant.product', 'user');
 
         return view('sales.show', compact('sale'));

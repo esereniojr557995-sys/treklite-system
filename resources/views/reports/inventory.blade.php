@@ -49,7 +49,6 @@
                 <tr>
                     <th>Product</th>
                     <th>Size / Color</th>
-                    <th>SKU</th>
                     <th class="text-end">Quantity</th>
                     <th class="text-end">Low at</th>
                     <th class="text-center">Status</th>
@@ -62,7 +61,6 @@
                     <tr>
                         <td>{{ $v->product->name }}</td>
                         <td>{{ $v->label }}</td>
-                        <td class="small text-muted">{{ $v->sku }}</td>
                         <td class="text-end">{{ $v->quantity }}</td>
                         <td class="text-end text-muted">{{ $v->low_stock_threshold }}</td>
                         <td class="text-center">

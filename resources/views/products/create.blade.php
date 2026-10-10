@@ -8,11 +8,7 @@
             <form method="POST" action="{{ route('products.store') }}">
                 @csrf
                 <div class="mb-3">
-                    <label class="form-label">SKU</label>
-                    <input type="text" name="sku" class="form-control" value="{{ old('sku') }}" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Name</label>
+                    <label class="form-label">Model</label>
                     <input type="text" name="name" class="form-control" value="{{ old('name') }}" required>
                 </div>
                 <div class="mb-3">

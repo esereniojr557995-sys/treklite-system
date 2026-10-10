@@ -1,23 +1,11 @@
 @extends('layouts.app')
 
-@php
-    $editing = $product->exists;
-
-    $variantRows = old('variants', $product->variants->map(fn ($v) => [
-        'id'                  => $v->id,
-        'sku'                 => $v->sku,
-        'size'                => $v->size,
-        'color'               => $v->color,
-        'price'               => $v->price,
-        'low_stock_threshold' => $v->low_stock_threshold,
-        'quantity'            => $v->quantity,
-    ])->values()->all());
-@endphp
+@php $editing = $product->exists; @endphp
 
 @section('title', $editing ? 'Edit Product' : 'Add Product')
 
 @section('content')
-    <h3 class="mb-3">{{ $editing ? 'Edit Product' : 'Add Product' }}</h3>
+    <h3 class="mb-3"></h3>
 
     <form method="POST"
           action="{{ $editing ? route('products.update', $product) : route('products.store') }}"
@@ -43,7 +31,7 @@
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label">Name</label>
+                            <label class="form-label">Model</label>
                             <input type="text" name="name" class="form-control" value="{{ old('name', $product->name) }}" required>
                         </div>
                         <div class="row g-2 mb-2">
@@ -51,12 +39,19 @@
                                 <label class="form-label">Category</label>
                                 <input type="text" name="category" list="categories" class="form-control" value="{{ old('category', $product->category) }}" placeholder="Slippers, Apparel, Textiles">
                                 <datalist id="categories">
-                                    <option value="Slippers"><option value="Apparel"><option value="Textiles">
+                                    @foreach ($categories->merge(['Slippers', 'Apparel', 'Textiles'])->unique() as $c)
+                                        <option value="{{ $c }}">
+                                    @endforeach
                                 </datalist>
                             </div>
                             <div class="col-6">
                                 <label class="form-label">Brand</label>
-                                <input type="text" name="brand" class="form-control" value="{{ old('brand', $product->brand) }}">
+                                <input type="text" name="brand" list="brands" class="form-control" value="{{ old('brand', $product->brand) }}" placeholder="e.g. Treklite">
+                                <datalist id="brands">
+                                    @foreach ($brands as $b)
+                                        <option value="{{ $b }}">
+                                    @endforeach
+                                </datalist>
                             </div>
                         </div>
                         <div class="mb-2">
@@ -88,7 +83,7 @@
                             <table class="table table-sm align-middle" id="variants-table">
                                 <thead>
                                     <tr>
-                                        <th>SKU</th><th>Size</th><th>Color</th>
+                                        <th>Model</th><th>Size</th><th>Color</th>
                                         <th style="width:100px">Price</th>
                                         <th style="width:80px">Low at</th>
                                         <th style="width:90px">Stock</th>
@@ -110,7 +105,10 @@
     </form>
 
     <script>
-        const EXISTING = @json($variantRows);
+        const EXISTING = {{ \Illuminate\Support\Js::from(old('variants', $product->variants->map(fn ($v) => [
+            'id' => $v->id, 'sku' => $v->sku, 'size' => $v->size, 'color' => $v->color,
+            'price' => $v->price, 'low_stock_threshold' => $v->low_stock_threshold, 'quantity' => $v->quantity,
+        ])->values()->all())) }};
 
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const tbody = document.querySelector('#variants-table tbody');

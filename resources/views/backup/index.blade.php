@@ -3,7 +3,7 @@
 @section('title', 'Database Backup and Restore')
 
 @section('content')
-    <h3 class="mb-3">Database Backup and Restore</h3>
+    <h3 class="mb-3"></h3>
 
     <div class="row g-3">
         <div class="col-lg-7">

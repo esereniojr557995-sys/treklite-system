@@ -3,7 +3,6 @@
 @section('title', 'Dashboard')
 
 @section('content')
-    <h3 class="mb-4">Dashboard</h3>
 
     {{-- 1. SALES SUMMARY --}}
     <h6 class="text-uppercase text-muted mb-2"><i class="bi bi-receipt"></i> Sales</h6>
@@ -63,10 +62,10 @@
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-danger-subtle fw-bold">Out of stock ({{ $outOfStock->count() }})</div>
-                <ul class="list-group list-group-flush">
-                    @forelse ($outOfStock->take(8) as $v)
+                <ul class="list-group list-group-flush js-paged" data-per="5">
+                    @forelse ($outOfStock as $v)
                         <li class="list-group-item d-flex justify-content-between">
-                            <span>{{ $v->product->name }} <span class="text-muted">&mdash; {{ $v->label }}</span></span>
+                            <span><a href="{{ route('inventory.index', ['product' => $v->product_id]) }}" class="text-decoration-none text-body">{{ $v->product->name }}</a> <span class="text-muted">&mdash; {{ $v->label }}</span></span>
                             <span class="badge bg-danger">0</span>
                         </li>
                     @empty
@@ -78,10 +77,10 @@
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
                 <div class="card-header bg-warning-subtle fw-bold">Low stock ({{ $lowStock->count() }})</div>
-                <ul class="list-group list-group-flush">
-                    @forelse ($lowStock->take(8) as $v)
+                <ul class="list-group list-group-flush js-paged" data-per="5">
+                    @forelse ($lowStock as $v)
                         <li class="list-group-item d-flex justify-content-between">
-                            <span>{{ $v->product->name }} <span class="text-muted">&mdash; {{ $v->label }}</span></span>
+                            <span><a href="{{ route('inventory.index', ['product' => $v->product_id]) }}" class="text-decoration-none text-body">{{ $v->product->name }}</a> <span class="text-muted">&mdash; {{ $v->label }}</span></span>
                             <span class="badge bg-warning text-dark">{{ $v->quantity }} left</span>
                         </li>
                     @empty
@@ -102,13 +101,13 @@
     <div class="row g-3 mb-4">
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header fw-bold">Latest stock received / adjusted</div>
-                <ul class="list-group list-group-flush">
+                <div class="card-header fw-bold">Latest stock received / counted</div>
+                <ul class="list-group list-group-flush js-paged" data-per="5">
                     @forelse ($recentMovements as $m)
                         <li class="list-group-item d-flex justify-content-between">
                             <span>
                                 {{ $m->variant->product->name }} <span class="text-muted">({{ $m->variant->label }})</span>
-                                <div class="small text-muted">{{ $m->type === 'receive' ? 'Received' : 'Adjusted' }} &middot; {{ $m->created_at->format('M d, h:i A') }}</div>
+                                <div class="small text-muted">{{ $m->summary }} &middot; {{ $m->created_at->format('M d, h:i A') }}@if ($m->user) &middot; {{ $m->user->name }}@endif</div>
                             </span>
                             <span class="fw-semibold {{ $m->quantity_change >= 0 ? 'text-success' : 'text-danger' }}">
                                 {{ $m->quantity_change > 0 ? '+' : '' }}{{ $m->quantity_change }}
@@ -126,7 +125,7 @@
                     <span class="fw-bold">Latest sales</span>
                     <a href="{{ route('sales.create') }}" class="btn btn-success btn-sm">+ New Sale</a>
                 </div>
-                <ul class="list-group list-group-flush">
+                <ul class="list-group list-group-flush js-paged" data-per="5">
                     @forelse ($recentSales as $sale)
                         <li class="list-group-item d-flex justify-content-between">
                             <span>
@@ -142,4 +141,37 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Each list shows 5 rows at a time with Previous / Next, so a panel never grows long.
+        document.querySelectorAll('ul.js-paged').forEach(ul => {
+            const per = parseInt(ul.dataset.per, 10) || 5;
+            const items = Array.from(ul.children);
+            if (items.length <= per) return;
+
+            const pages = Math.ceil(items.length / per);
+            let page = 0;
+
+            const bar = document.createElement('div');
+            bar.className = 'card-footer bg-white d-flex justify-content-between align-items-center py-1';
+            bar.innerHTML = '<button type="button" class="btn btn-sm btn-outline-secondary" data-d="-1">&lsaquo; Prev</button>' +
+                            '<span class="small text-muted"></span>' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary" data-d="1">Next &rsaquo;</button>';
+            ul.after(bar);
+
+            const show = () => {
+                items.forEach((li, i) => li.classList.toggle('d-none', Math.floor(i / per) !== page));
+                bar.querySelector('span').textContent = 'Page ' + (page + 1) + ' of ' + pages + ' (' + items.length + ' items)';
+                bar.querySelector('[data-d="-1"]').disabled = page === 0;
+                bar.querySelector('[data-d="1"]').disabled = page === pages - 1;
+            };
+            bar.addEventListener('click', e => {
+                const b = e.target.closest('button[data-d]');
+                if (!b) return;
+                page = Math.min(pages - 1, Math.max(0, page + parseInt(b.dataset.d, 10)));
+                show();
+            });
+            show();
+        });
+    </script>
 @endsection

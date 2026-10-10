@@ -49,8 +49,8 @@ class DashboardController extends Controller
             ->get();
 
         // 4. Recent transactions
-        $recentSales     = Sale::with('user')->latest('sold_at')->limit(6)->get();
-        $recentMovements = StockMovement::with('variant.product', 'user')->latest()->limit(6)->get();
+        $recentSales     = Sale::with('user')->latest('sold_at')->limit(30)->get();
+        $recentMovements = StockMovement::with('variant.product', 'user')->latest()->latest('id')->limit(30)->get();
 
         return view('dashboard', compact(
             'today', 'week', 'month', 'byPayment',

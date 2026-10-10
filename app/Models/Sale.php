@@ -22,9 +22,13 @@ class Sale extends Model
         'change_amount'   => 'decimal:2',
     ];
 
+    /** Payment methods accepted at the counter. */
     public const PAYMENT_LABELS = [
-        'cash' => 'Cash', 'gcash' => 'GCash', 'paymaya' => 'PayMaya', 'card' => 'Card (tap-to-pay)',
+        'cash' => 'Cash', 'gcash' => 'GCash', 'bank_transfer' => 'Bank Transfer',
     ];
+
+    /** Methods from older records, shown only so old invoices still display correctly. */
+    private const LEGACY_LABELS = ['paymaya' => 'PayMaya', 'card' => 'Card'];
 
     public function user(): BelongsTo
     {
@@ -38,7 +42,7 @@ class Sale extends Model
 
     public function getPaymentLabelAttribute(): string
     {
-        return self::PAYMENT_LABELS[$this->payment_method] ?? ucfirst($this->payment_method);
+        return self::PAYMENT_LABELS[$this->payment_method] ?? self::LEGACY_LABELS[$this->payment_method] ?? ucfirst($this->payment_method);
     }
 
     public function getPaymentProofUrlAttribute(): ?string

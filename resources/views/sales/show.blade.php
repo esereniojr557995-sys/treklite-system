@@ -48,7 +48,7 @@
                 <tbody>
                     @foreach ($sale->items as $item)
                         <tr>
-                            <td>{{ $item->variant->product->name }}<div class="small text-muted">{{ $item->variant->sku }}</div></td>
+                            <td>{{ $item->variant->product->name }}</td>
                             <td>{{ $item->variant->label }}</td>
                             <td class="text-end">{{ $item->quantity }}</td>
                             <td class="text-end">₱{{ number_format($item->unit_price, 2) }}</td>
@@ -63,11 +63,11 @@
 
             <div class="small">
                 <div><span class="text-muted">Payment method:</span> {{ $sale->payment_label }}</div>
-                @if ($sale->payment_reference)
-                    <div><span class="text-muted">Reference no.:</span> {{ $sale->payment_reference }}</div>
-                @else
+                @if ($sale->payment_method === 'cash')
                     <div><span class="text-muted">Amount received:</span> ₱{{ number_format($sale->amount_tendered, 2) }}
                         &nbsp; <span class="text-muted">Change:</span> ₱{{ number_format($sale->change_amount, 2) }}</div>
+                @else
+                    <div><span class="text-muted">Amount paid:</span> ₱{{ number_format($sale->total_amount, 2) }}</div>
                 @endif
             </div>
 

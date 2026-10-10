@@ -56,7 +56,7 @@
     @endphp
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0">Sales Report</h3>
+        <h3 class="mb-0"></h3>
         <button onclick="window.print()" class="btn btn-outline-dark no-print"><i class="bi bi-printer"></i> Print</button>
     </div>
     

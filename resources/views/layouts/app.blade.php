@@ -98,6 +98,9 @@
         .sidebar-toggle {
             display: none;
         }
+        .sidebar .profile { display: flex; align-items: center; gap: .6rem; padding: .45rem .55rem; border-radius: .5rem; color: #fff; text-decoration: none; }
+        .sidebar a.profile:hover, .sidebar .profile.active { background: rgba(255, 255, 255, .14); }
+        .sidebar .profile .bi-person-circle { font-size: 2rem; line-height: 1; }
 
         /* --- Mobile: collapse sidebar off-canvas --- */
         @media (max-width: 991.98px) {
@@ -142,10 +145,9 @@
             ['route' => 'dashboard',       'label' => 'Dashboard',     'icon' => 'bi-speedometer2', 'match' => 'dashboard'],
             ['route' => 'sales.create',    'label' => 'New Sale',      'icon' => 'bi-cart-plus',    'match' => 'sales.create'],
             ['route' => 'sales.index',     'label' => 'Sales Records', 'icon' => 'bi-receipt',      'match' => 'sales.index'],
+               ['route' => 'products.index',  'label' => 'Products',      'icon' => 'bi-tags',         'match' => 'products.*'],
             ['route' => 'inventory.index', 'label' => 'Inventory',     'icon' => 'bi-box-seam',     'match' => 'inventory.*'],
-            ['route' => 'products.index',  'label' => 'Products',      'icon' => 'bi-tags',         'match' => 'products.*'],
             ['route' => 'reports.sales',   'label' => 'Reports',       'icon' => 'bi-graph-up',     'match' => 'reports.*'],
-            ['route' => 'users.index',  'label' => 'Users',  'icon' => 'bi-people',          'match' => 'users.*'],
             ['route' => 'backup.index', 'label' => 'Backup', 'icon' => 'bi-cloud-arrow-down','match' => 'backup.*'],
         ]
         : [
@@ -169,18 +171,26 @@
     </nav>
 
     <div class="sidebar-footer">
-        <div class="small text-white-50 mb-1">Signed in as</div>
-        <div class="fw-semibold">{{ auth()->user()?->name }}</div>
-        <div class="mb-2">
+    <div class="small text-white-50 mb-2">Signed in as</div>
+
+    @php $profileTag = $isOwner ? 'a' : 'div'; @endphp
+    <{{ $profileTag }} @if ($isOwner) href="{{ route('users.index') }}" title="Manage user accounts" @endif
+        class="profile mb-2 {{ request()->routeIs('users.*') ? 'active' : '' }}">
+        <i class="bi bi-person-circle"></i>
+        <span class="flex-grow-1 lh-sm">
+            <span class="d-block fw-semibold">{{ auth()->user()?->name }}</span>
             <span class="badge bg-light text-dark">{{ auth()->user()?->role }}</span>
-        </div>
-        <form action="{{ route('logout') }}" method="POST">
-            @csrf
-            <button class="btn btn-outline-light btn-sm w-100">
-                <i class="bi bi-box-arrow-right"></i> Log out
-            </button>
-        </form>
-    </div>
+        </span>
+        @if ($isOwner) <i class="bi bi-chevron-right small text-white-50"></i> @endif
+    </{{ $profileTag }}>
+
+    <form action="{{ route('logout') }}" method="POST">
+        @csrf
+        <button class="btn btn-outline-light btn-sm w-100">
+            <i class="bi bi-box-arrow-right"></i> Log out
+        </button>
+    </form>
+</div>
 </aside>
 
 <div class="main-wrapper">

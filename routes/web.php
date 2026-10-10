@@ -42,8 +42,7 @@ Route::middleware(['auth', EnsureUserIsActive::class])->group(function () {
     Route::get('/products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit');
     Route::put('/products/{product}', [ProductController::class, 'update'])->name('products.update');
 
-    Route::post('/inventory/{variant}/receive', [InventoryController::class, 'receive'])->name('inventory.receive');
-    Route::post('/inventory/{variant}/adjust', [InventoryController::class, 'adjust'])->name('inventory.adjust');
+    Route::post('/inventory/{variant}/stock', [InventoryController::class, 'update'])->name('inventory.stock');
 
     Route::get('/reports/sales', [ReportController::class, 'sales'])->name('reports.sales');
     Route::get('/reports/inventory', [InventoryReportController::class, 'index'])->name('reports.inventory');
