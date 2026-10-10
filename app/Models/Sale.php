@@ -12,13 +12,14 @@ class Sale extends Model
     protected $fillable = [
         'invoice_number', 'user_id', 'customer_name', 'customer_address', 'customer_contact',
         'payment_method', 'payment_reference', 'payment_proof_path',
-        'amount_tendered', 'change_amount', 'total_amount', 'sold_at',
+        'amount_tendered', 'digital_amount', 'change_amount', 'total_amount', 'sold_at',
     ];
 
     protected $casts = [
         'sold_at'         => 'datetime',
         'total_amount'    => 'decimal:2',
         'amount_tendered' => 'decimal:2',
+        'digital_amount'  => 'decimal:2',
         'change_amount'   => 'decimal:2',
     ];
 

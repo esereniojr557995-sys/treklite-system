@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3 class="mb-0"></h3>
+        <h3 class="mb-0">Sales Records</h3>
         <a href="{{ route('sales.create') }}" class="btn btn-success">+ New Sale</a>
     </div>
 
@@ -14,7 +14,7 @@
             <div class="row g-2 align-items-end">
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label small mb-1">Search</label>
-                    <input type="search" name="q" value="{{ $q }}" class="form-control form-control-sm" placeholder="Invoice no., customer name or contact">
+                    <input type="search" name="q" value="{{ $q }}" class="form-control form-control-sm" placeholder="Invoice no., customer, contact or reference no.">
                 </div>
                 <div class="col-lg-2 col-md-3 col-6">
                     <label class="form-label small mb-1">From</label>
@@ -77,9 +77,9 @@
                             <td>{{ $sale->customer_name }}</td>
                             <td>{{ $sale->user->name }}</td>
                             <td>
-                                {{ $sale->payment_label }}
-                                @if ($sale->payment_proof_path)
-                                    <i class="bi bi-image text-muted" title="Payment photo attached"></i>
+                                {{ $sale->payment_label }}@if ($sale->payment_method !== 'cash' && $sale->amount_tendered > 0) + Cash @endif
+                                @if ($sale->payment_reference)
+                                    <div class="small text-muted">Ref: {{ $sale->payment_reference }}</div>
                                 @endif
                             </td>
                             <td class="text-end">₱{{ number_format($sale->total_amount, 2) }}</td>

@@ -70,8 +70,11 @@
                         @endforeach
                     </select>
 
-                    {{-- Cash --}}
+                    {{-- Cash: always visible. With GCash / Bank Transfer it is the cash part of a split payment
+                         (cash on hand is short -> the rest goes through GCash, or the customer's e-wallet is short
+                         -> the rest is paid in cash). --}}
                     <div id="cash-box">
+                        <label class="form-label small mb-0" id="cash-label">Amount received</label>
                         <div class="input-group input-group-sm mb-1">
                             <input type="number" step="0.01" min="0" name="amount_tendered" id="tendered" class="form-control" placeholder="Amount received" value="{{ old('amount_tendered') }}">
                             <button type="button" class="btn btn-outline-secondary" id="exact-btn" title="Customer pays the exact total">Exact</button>
@@ -91,8 +94,8 @@
                         <input type="text" name="payment_reference" id="payment-ref" class="form-control form-control-sm mb-2" placeholder="Reference no. from the payment confirmation" maxlength="100" value="{{ old('payment_reference') }}">
                         <label class="form-label small mb-0">Photo of the payment confirmation <span class="text-danger">*</span></label>
                         <input type="file" name="payment_proof" id="payment-proof" accept="image/*" capture="environment" class="form-control form-control-sm mb-1">
-                        <div class="small text-muted mb-1">Take a clear photo of the customer's confirmation screen. The amount paid must be visible and must match the total.</div>
-                        <div class="small mb-2">Amount to be paid: <strong id="digital-amount">₱0.00</strong></div>
+                        <div class="small text-muted mb-1">Take a clear photo of the customer's confirmation screen. The amount paid must be visible and must match the amount shown below.</div>
+                        <div class="small mb-2">Amount to be paid via <span id="digital-name">GCash</span>: <strong id="digital-amount">₱0.00</strong></div>
                     </div>
 
                     <div id="cart-inputs"></div>
@@ -396,24 +399,29 @@
         /* ---------- payment ---------- */
         function togglePayment() {
             const cash = $('payment-method').value === 'cash';
-            $('cash-box').classList.toggle('d-none', !cash);
+            const sel  = $('payment-method');
             $('digital-box').classList.toggle('d-none', cash);
+            $('digital-name').textContent = sel.options[sel.selectedIndex].text;
+            $('cash-label').textContent = cash ? 'Amount received' : 'Cash received (leave blank if the whole amount is paid through ' + sel.options[sel.selectedIndex].text + ')';
+            $('exact-btn').classList.toggle('d-none', !cash);
             $('payment-proof').required = !cash;
             $('payment-ref').required = !cash;
             updateState();
         }
 
         /* The sale can only be completed when the cart has items and the payment is valid:
-           cash  -> the amount received is not less than the total (more is fine, change is returned)
-           other -> the reference number is entered and a photo of the payment confirmation is attached */
+           cash          -> the amount received is not less than the total (more is fine, change is returned)
+           GCash / bank  -> split payment: the cash received (may be blank) plus the rest sent digitally equals the total;
+                            the reference number is entered and a photo of the confirmation is attached.
+                            Cash that already covers the total is refused (choose Cash instead). */
         function updateState() {
             const total = cartTotal();
             const cash = $('payment-method').value === 'cash';
+            const tendered = parseFloat($('tendered').value);
             let ok = cart.length > 0;
             let msg = '';
 
             if (cash) {
-                const tendered = parseFloat($('tendered').value);
                 if (cart.length && (isNaN(tendered) || tendered + 0.001 < total)) {
                     ok = false;
                     msg = isNaN(tendered) ? 'Enter the amount received.' : 'Amount received is less than the total by ' + peso(total - tendered) + '.';
@@ -421,7 +429,17 @@
                 const change = isNaN(tendered) ? 0 : Math.max(0, tendered - total);
                 $('cash-msg').innerHTML = msg ? '<span class="text-danger">' + msg + '</span>' : 'Change: <strong>' + peso(change) + '</strong>';
             } else {
-                $('digital-amount').textContent = peso(total);
+                const c = isNaN(tendered) ? 0 : tendered;
+                const rest = Math.max(0, total - c);
+                $('digital-amount').textContent = peso(rest);
+                if (cart.length && c + 0.001 >= total) {
+                    ok = false;
+                    $('cash-msg').innerHTML = '<span class="text-danger">The cash already covers the total. Choose Cash as the payment method.</span>';
+                } else {
+                    $('cash-msg').innerHTML = c > 0
+                        ? 'Cash ' + peso(c) + ' + <span class="digital-name-inline">' + esc($('digital-name').textContent) + '</span> <strong>' + peso(rest) + '</strong>'
+                        : 'Whole amount is paid through ' + esc($('digital-name').textContent) + '.';
+                }
                 if (cart.length && (!$('payment-ref').value.trim() || !$('payment-proof').files.length)) { ok = false; }
             }
             $('submit-btn').disabled = !ok;

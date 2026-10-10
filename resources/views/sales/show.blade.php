@@ -63,11 +63,17 @@
 
             <div class="small">
                 <div><span class="text-muted">Payment method:</span> {{ $sale->payment_label }}</div>
+                @if ($sale->payment_reference)
+                    <div><span class="text-muted">Reference no.:</span> {{ $sale->payment_reference }}</div>
+                @endif
                 @if ($sale->payment_method === 'cash')
                     <div><span class="text-muted">Amount received:</span> ₱{{ number_format($sale->amount_tendered, 2) }}
                         &nbsp; <span class="text-muted">Change:</span> ₱{{ number_format($sale->change_amount, 2) }}</div>
                 @else
-                    <div><span class="text-muted">Amount paid:</span> ₱{{ number_format($sale->total_amount, 2) }}</div>
+                    @if ($sale->amount_tendered > 0)
+                        <div><span class="text-muted">Paid in cash:</span> ₱{{ number_format($sale->amount_tendered, 2) }}</div>
+                    @endif
+                    <div><span class="text-muted">Paid via {{ $sale->payment_label }}:</span> ₱{{ number_format($sale->digital_amount, 2) }}</div>
                 @endif
             </div>
 

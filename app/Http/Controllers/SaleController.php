@@ -25,7 +25,8 @@ class SaleController extends Controller
             ->when($q !== '', fn ($s) => $s->where(fn ($w) => $w
                 ->where('invoice_number', 'like', "%{$q}%")
                 ->orWhere('customer_name', 'like', "%{$q}%")
-                ->orWhere('customer_contact', 'like', "%{$q}%")))
+                ->orWhere('customer_contact', 'like', "%{$q}%")
+                ->orWhere('payment_reference', 'like', "%{$q}%")))
             ->when($from !== '', fn ($s) => $s->whereDate('sold_at', '>=', $from))
             ->when($to !== '', fn ($s) => $s->whereDate('sold_at', '<=', $to))
             ->when($userId !== '', fn ($s) => $s->where('user_id', $userId))
@@ -54,7 +55,6 @@ class SaleController extends Controller
                 'image'    => $p->image_url,
                 'variants' => $p->variants->map(fn ($v) => [
                     'id'    => $v->id,
-                    'sku'   => $v->sku,
                     'size'  => $v->size,
                     'color' => $v->color,
                     'label' => $v->label,
@@ -78,12 +78,16 @@ class SaleController extends Controller
             'customer_address'   => ['nullable', 'string', 'max:255'],
             'customer_contact'   => ['nullable', 'string', 'max:50'],
             'payment_method'     => ['required', 'in:cash,gcash,bank_transfer'],
+            'payment_reference'  => ['nullable', 'required_unless:payment_method,cash', 'string', 'max:100', 'unique:sales,payment_reference'],
             'payment_proof'      => ['nullable', 'required_unless:payment_method,cash', 'image', 'max:4096'],
+            // Cash sale: the amount received. GCash / bank transfer: optional cash part of a split payment.
             'amount_tendered'    => ['nullable', 'required_if:payment_method,cash', 'numeric', 'min:0'],
             'items'              => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['required', 'integer', 'exists:product_variants,id'],
             'items.*.quantity'   => ['required', 'integer', 'min:1'],
         ], [
+            'payment_reference.required_unless' => 'Enter the reference number shown on the customer\'s payment confirmation.',
+            'payment_reference.unique'          => 'This reference number was already used on another sale.',
             'payment_proof.required_unless' => 'Attach a photo of the payment confirmation (it must show the amount paid).',
             'amount_tendered.required_if'   => 'Enter the amount received from the customer.',
         ]);
@@ -111,12 +115,24 @@ class SaleController extends Controller
                 throw ValidationException::withMessages(['items' => ['Not enough stock for: ' . implode('; ', $short)]]);
             }
 
-            $isCash   = $data['payment_method'] === 'cash';
-            // Cash: the amount received must cover the total (more is fine, the change is returned).
-            // GCash / bank transfer: the exact total is paid and the photo of the confirmation is the proof.
-            $tendered = $isCash ? (float) $data['amount_tendered'] : $total;
-            if ($tendered + 0.001 < $total) {
-                throw ValidationException::withMessages(['amount_tendered' => ['The amount received (₱' . number_format($tendered, 2) . ') is less than the total (₱' . number_format($total, 2) . '). The sale was not processed.']]);
+            $isCash = $data['payment_method'] === 'cash';
+            $cash   = round((float) ($data['amount_tendered'] ?? 0), 2);
+
+            if ($isCash) {
+                // Cash only: the amount received must cover the total (more is fine, the change is returned).
+                if ($cash + 0.001 < $total) {
+                    throw ValidationException::withMessages(['amount_tendered' => ['The amount received (₱' . number_format($cash, 2) . ') is less than the total (₱' . number_format($total, 2) . '). The sale was not processed.']]);
+                }
+                $digital = 0.0;
+                $change  = round($cash - $total, 2);
+            } else {
+                // GCash / bank transfer, optionally split with cash: cash received + digital portion = total.
+                // The digital portion is whatever the cash does not cover, and it is what the photo must show.
+                if ($cash + 0.001 >= $total) {
+                    throw ValidationException::withMessages(['amount_tendered' => ['The cash received already covers the total. Choose Cash as the payment method.']]);
+                }
+                $digital = round($total - $cash, 2);
+                $change  = 0.0;
             }
 
             $prefix = 'INV-' . now()->format('Ymd');
@@ -129,10 +145,11 @@ class SaleController extends Controller
                 'customer_address'   => $data['customer_address'] ?? null,
                 'customer_contact'   => $data['customer_contact'] ?? null,
                 'payment_method'     => $data['payment_method'],
-                'payment_reference'  => null,
+                'payment_reference'  => $isCash ? null : trim($data['payment_reference']),
                 'payment_proof_path' => $request->file('payment_proof')?->store('payment-proofs', 'public'),
-                'amount_tendered'    => $tendered,
-                'change_amount'      => max(0, $tendered - $total),
+                'amount_tendered'    => $cash,
+                'digital_amount'     => $digital,
+                'change_amount'      => $change,
                 'total_amount'       => $total,
                 'sold_at'            => now(),
             ]);
